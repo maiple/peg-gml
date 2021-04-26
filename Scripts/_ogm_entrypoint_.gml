@@ -1,0 +1,2 @@
+// defined in peggml
+main()

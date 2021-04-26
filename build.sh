@@ -1,0 +1,1 @@
+haxe -debug -dce full -lib sfhx -lib sfgml -lib moon-peg -cp src -main PegGML.hx -js ./Scripts/peggml.gml
