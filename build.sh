@@ -1,1 +1,8 @@
-haxe -debug -dce full -lib sfhx -lib sfgml -lib moon-peg -cp src -main PegGML.hx -js ./Scripts/peggml.gml
+# create "datafiles" folder
+if [ ! -d "datafiles/" ]
+then
+    mkdir "datafiles/"
+fi
+
+# g++
+g++ -std=gnu++17 -shared peggml.cpp -static-libgcc -static-libstdc++ -fPIC -DIS_DLL -o datafiles/libpeggml.so -s
