@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <vector>
+#include <map>
+#include <cassert>
 
 #include "peggml.h"
 #define ERROR_PREFIX peggml
@@ -38,7 +40,7 @@ namespace
 
 	parser* _get_parser(ty_real _handle)
 	{
-		size_t handle = handle;
+		size_t handle = _handle;
 		if (g_parsers.size() <= handle || !g_parsers[handle])
 		{
 			return error(nullptr, "invalid handle %d", _handle);
@@ -51,7 +53,7 @@ namespace
 }
 
 handle_t
-peggml_parser_create(ty_string syntax)
+peggml_parser_create(ty_string grammar)
 {
 	// find index for new parser
 	size_t index = g_parsers.size();
@@ -67,11 +69,27 @@ peggml_parser_create(ty_string syntax)
 	{
 		g_parsers.emplace_back();
 	}
-	std::unique_ptr<parser> p(new parser(syntax));
+	std::unique_ptr<parser> p(new parser());
 
-	if (!*p)
+	std::stringstream errlog;
+
+	p->log = [&errlog](size_t line, size_t col, const std::string& msg) {
+		errlog << line << ":" << col << ": " << msg << "\n";
+	};
+
+	auto ok = p->load_grammar(grammar);
+
+	if (!ok || !*p)
 	{
-		return error(-1, "grammar syntax invalid");
+		std::string errstr = errlog.str();
+		if (errstr.length() > 0)
+		{
+			return error(-1, "%s", errstr.c_str());
+		}
+		else
+		{
+			return error(-2, "grammar syntax invalid");
+		}
 	}
 	else
 	{
@@ -111,6 +129,38 @@ namespace
 	bool g_parse_in_progress = false;
 	std::string g_parse_text;
 	callstack g_parse_cs;
+
+	// suspended parse context
+	const SemanticValues* g_sv;
+	symbol_id_t g_symbol_id;
+	uint32_t g_uuid = 0;
+	uuid_t g_root_uuid = -1;
+}
+
+ty_real
+peggml_parser_set_symbol_id(handle_t handle, ty_string symbol, symbol_id_t symbol_id)
+{
+	if (symbol_id == 0)
+	{
+		return error(2, "cannot set symbol id to 0.");
+	}
+
+	if (symbol == nullptr)
+	{
+		return error(3, "argument string is nullptr");
+	}
+
+	get_parser(p, handle, 1);
+
+	(*p)[symbol] = [symbol_id](const SemanticValues& sv) -> uuid_t {
+		g_sv = &sv;
+		// we could store 'symbol', but lazy...
+		g_symbol_id = symbol_id;
+		g_parse_cs.yield();
+		return g_uuid++;
+	};
+
+	return 0;
 }
 
 ty_real
@@ -121,14 +171,183 @@ peggml_parse_begin(handle_t handle, ty_string _text)
 		return error(-1, "parse already in progress.");
 	}
 
-	get_parser(p, handle, -2);
-
 	// copy to static location for permanent access even after setjmp/longjmp
 	g_parse_text = _text;
 
-	g_parse_cs.begin([p](){
-		p->parse()
-	})
+	get_parser(p, handle, -2);
+
+	g_parse_cs.begin([p, text=g_parse_text.c_str()](){
+		p->parse(text, g_root_uuid, nullptr);
+		g_parse_in_progress = false;
+	});
 	
 	return 0;
 }
+
+ty_real
+peggml_parse_next()
+{
+	if (g_parse_cs.resume())
+	{
+		return g_symbol_id;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+ty_real
+peggml_parse_elt_get_uuid()
+{
+	return static_cast<uuid_t>(g_uuid);
+}
+
+ty_string
+peggml_parse_elt_get_string()
+{
+	return STORE_STRING(g_sv->sv());
+}
+
+ty_real
+peggml_parse_elt_get_string_offset()
+{
+	return g_sv->sv().data() - g_sv->ss;
+}
+
+ty_real
+peggml_parse_elt_get_string_line()
+{
+	return g_sv->line_info().first;
+}
+
+ty_real
+peggml_parse_elt_get_string_column()
+{
+	return g_sv->line_info().second;
+}
+
+ty_real
+peggml_parse_elt_get_choice()
+{
+	return g_sv->choice();
+}
+
+#define RANGE_CHECK(i, container, rvalue) \
+	if (i < 0 || i >= (container).size()) \
+		{ return error(rvalue, "index out of bounds"); }
+
+index_t
+peggml_parse_elt_get_child_count()
+{
+	return g_sv->size();
+}
+
+ty_real
+peggml_parse_elt_get_child_uuid(index_t _i)
+{
+	size_t i = _i;
+	RANGE_CHECK(i, *g_sv, -1);
+	return std::any_cast<uuid_t>(g_sv->at(i));
+}
+
+index_t
+peggml_parse_elt_get_token_count()
+{
+	return g_sv->tokens.size();
+}
+
+ty_real
+peggml_parse_elt_get_token_offset(index_t _i)
+{
+	size_t i = _i;
+	RANGE_CHECK(i, g_sv->tokens, 0);
+	return g_sv->token(i).data() - g_sv->ss;
+}
+
+ty_string
+peggml_parse_elt_get_token_string(index_t _i)
+{
+	size_t i = _i;
+	RANGE_CHECK(i, g_sv->tokens, "");
+	return STORE_STRING(g_sv->token(i));
+}
+
+ty_real
+peggml_parse_elt_get_token_number()
+{
+	try
+	{
+		return g_sv->token_to_number<ty_real>();
+	}
+	catch(...)
+	{
+		return error(0, "error occurred parsing number from token");
+	}
+}
+
+external uuid_t
+peggml_get_root_uuid()
+{
+	return g_root_uuid;
+}
+
+#ifndef PEGGML_IS_DLL
+
+int main(int argc, char** argv)
+{
+	std::cout << "hello world\n";
+	int handle = peggml_parser_create(R"(
+		# Grammar for Calculator...
+		Additive    <- Multitive '+' Additive / Multitive
+		Multitive   <- Primary '*' Multitive / Primary
+		Primary     <- '(' Additive ')' / Number
+		Number      <- < [0-9]+ >
+		%whitespace <- [ \t]*
+	)");
+	peggml_parser_set_symbol_id(handle, "Additive", 1);
+	peggml_parser_set_symbol_id(handle, "Multitive", 2);
+	peggml_parser_set_symbol_id(handle, "Number", 4);
+	if (peggml_parse_begin(handle, "5 + (3 * 7) + 2"))
+	{
+		std::cerr << peggml_error_str() << std::endl;
+		return 1;
+	}
+	std::map<uuid_t, int> values;
+	int value;
+	while (true)
+	{
+		switch(static_cast<int32_t>(peggml_parse_next()))
+		{
+		case 1:
+			value = 0;
+			for (size_t i = 0; i < peggml_parse_elt_get_child_count(); ++i)
+			{
+				uuid_t child = peggml_parse_elt_get_child_uuid(i);
+				value += values[i];
+			}
+			break;
+		case 2:
+			value = 1;
+			for (size_t i = 0; i < peggml_parse_elt_get_child_count(); ++i)
+			{
+				uuid_t child = peggml_parse_elt_get_child_uuid(i);
+				value *= values[i];
+			}
+			break;
+		case 4:
+			value = peggml_parse_elt_get_token_number();
+			break;
+		default:
+			// no more to parse.
+			goto end_loop;
+		}
+
+		values[peggml_parse_elt_get_uuid()] = value;
+	}
+end_loop:
+	std::cout << "final value is " << value << std::endl;
+	return 0;
+}
+
+#endif
