@@ -74,10 +74,12 @@ public:
 
     // start execution; pass a lambda in to execute.
     #if defined(__GNUC__)
-    __attribute__((optimize("O0")))
+        __attribute__((optimize("O0")))
+        __attribute__((noinline))
     #endif
     #if defined(_MSC_VER)
-    #pragma optimize( "", off )
+        #pragma optimize( "", off )
+        __declspec(noinline)
     #endif
     void begin(std::function<void()> fn)
     {
@@ -87,16 +89,13 @@ public:
             m_main = [](){};
         }
 
+        m_state = CS_SUSPENDED;
+
         // run _begin, which will do all of the following:
         // - set stack pointers to the member stack.
         // - store jump buffer which will execute m_main when longjmp'd to
-        // - longjmp back here.
-        if(setjmp(m_env_external))
-        {
-            // m_main will be executed when resume() is invoked.
-            m_state = CS_SUSPENDED;
-        }
-        else
+        // - longjmp back here and return.
+        if(!setjmp(m_env_external))
         {
             _begin();
         }
@@ -163,7 +162,7 @@ private:
     static bool stack_direction_helper(volatile int* a)
     {
         volatile int b;
-        return (reinterpret_cast<uintptr_t>(&b) > reinterpret_cast<uintptr_t>(a));
+        return (reinterpret_cast<uintptr_t>(&b) < reinterpret_cast<uintptr_t>(a));
     }
 
     // helper function for begin()
@@ -177,6 +176,7 @@ private:
     #endif
     void _begin() noexcept
     {
+        static callstack* volatile s_cs{ this };
         // step 1: set stack pointer registers to secondary stack ------------------------
 
         // macros: see https://sourceforge.net/p/predef/wiki/Architectures/
@@ -186,7 +186,7 @@ private:
                 // x86
                 asm volatile(
                     "movl %0, esp\n\t"
-                    "movl ebp, esp"
+                    "movl esp, ebp"
                     : /* No outputs. */
                     : "rm" (m_stack_base)
                 );
@@ -195,7 +195,7 @@ private:
                 // x86_64
                 asm volatile(
                     "movq %0, %%rsp\n\t"
-                    "movq %%rbp, %%rsp"
+                    "movq %%rsp, %%rbp"
                     : /* No outputs. */
                     : "rm" (m_stack_base)
                 );
@@ -215,19 +215,31 @@ private:
             #error "compiler or architecture not supported. Consider adding support -- it's just two lines of asm."
         #else
             #undef PEGGML_ARCH_DEFINED
-        
-            // step 2: set stack pointer registers to secondary stack ------------------------
-            if (setjmp(m_env_internal) == 0)
-            {
-                longjmp(m_env_external, 1);
-            }
-            else
-            {
-                m_main();
-                longjmp(m_env_external, CS_TERMINATE);
-            }
+
+            // step 2: begin function execution on secondary stack ------------------------
+            s_cs->__begin();
         #endif
     }
+
+    [[noreturn]]
+     #ifdef __GNUC__
+        __attribute__((noinline))
+    #elif defined(_MSC_VER)
+        __declspec(noinline)
+    #endif
+    void __begin()
+    {
+        if (setjmp(m_env_internal) == 0)
+        {
+            longjmp(m_env_external, 1);
+        }
+        else
+        {
+            m_main();
+            longjmp(m_env_external, CS_TERMINATE);
+        }
+    }
+    
 
     #if defined(_MSC_VER)
     #pragma optimize( "", on )
