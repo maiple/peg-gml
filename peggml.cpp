@@ -324,7 +324,7 @@ int main(int argc, char** argv)
 			for (size_t i = 0; i < peggml_parse_elt_get_child_count(); ++i)
 			{
 				uuid_t child = peggml_parse_elt_get_child_uuid(i);
-				value += values[i];
+				value += values[child];
 			}
 			break;
 		case 2:
@@ -332,7 +332,7 @@ int main(int argc, char** argv)
 			for (size_t i = 0; i < peggml_parse_elt_get_child_count(); ++i)
 			{
 				uuid_t child = peggml_parse_elt_get_child_uuid(i);
-				value *= values[i];
+				value *= values[child];
 			}
 			break;
 		case 4:
