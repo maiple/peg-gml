@@ -3,14 +3,20 @@
 #define _glue(a,b) a ## b
 #define glue(a,b) _glue(a, b)
 
-#ifndef __unix__ 
-#define external          \
-	extern "C"            \
-	__declspec(dllexport)
-
+#ifdef EMSCRIPTEN
+	#define external \
+		EMSCRIPTEN_KEEPALIVE \
+		extern "C"
 #else
-#define external          \
-	extern "C"
+	#ifndef __unix__ 
+	#define external          \
+		extern "C"            \
+		__declspec(dllexport)
+
+	#else
+	#define external          \
+		extern "C"
+	#endif
 #endif
 
 #define TEST_INIT size_t testnum = 0;

@@ -52,6 +52,7 @@ public:
 
 #ifndef EMSCRIPTEN
 
+
 // default size is 8 mb
 class callstack : callstack_base
 {
@@ -72,10 +73,14 @@ public:
     { }
 
     // start execution; pass a lambda in to execute.
+    #if defined(__GNUC__)
+    __attribute__((optimize("O0")))
+    #endif
+    #if defined(_MSC_VER)
+    #pragma optimize( "", off )
+    #endif
     void begin(std::function<void()> fn)
     {
-        
-
         m_main = fn;
         if (!m_main)
         {
@@ -96,6 +101,9 @@ public:
             _begin();
         }
     }
+    #if defined(_MSC_VER)
+    #pragma optimize( "", on )
+    #endif
 
     // this function blocks until internal state yields or terminates.
     // return false if execution has terminated
@@ -146,8 +154,10 @@ private:
     }
 
     #ifdef __GNUC__
-        __attribute__((noinline)) 
+        __attribute__((noinline))
+        __attribute__((optimize("O0")))
     #elif defined(_MSC_VER)
+        #pragma optimize( "", off )
         __declspec(noinline)
     #endif
     static bool stack_direction_helper(volatile int* a)
@@ -218,6 +228,10 @@ private:
             }
         #endif
     }
+
+    #if defined(_MSC_VER)
+    #pragma optimize( "", on )
+    #endif
 };
 
 #else
@@ -286,10 +300,16 @@ public:
     }
 
 private:
+    [[noreturn]]
     void _begin()
     {
-        m_main();
-        m_state = CS_INACTIVE;
+        while (true)
+        {
+            m_main();
+            m_state = CS_INACTIVE;
+            m_main = [](){};
+            emscripten_fiber_swap(&m_fiber, &m_fiber_main);
+        }
     }
 };
 
