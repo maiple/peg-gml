@@ -128,13 +128,47 @@ namespace
 {
 	bool g_parse_in_progress = false;
 	std::string g_parse_text;
-	callstack g_parse_cs;
+	std::unique_ptr<callstack> _g_parse_cs_ptr;
+
+	// return callstack, allocating one if none exists.
+	callstack& get_parse_cs()
+	{
+		if (!_g_parse_cs_ptr)
+		{
+			_g_parse_cs_ptr.reset(new callstack());
+		}
+
+		return *_g_parse_cs_ptr.get();
+	}
+
+	#define g_parse_cs get_parse_cs()
 
 	// suspended parse context
 	const SemanticValues* g_sv;
 	symbol_id_t g_symbol_id;
 	uint32_t g_uuid = 0;
 	uuid_t g_root_uuid = -1;
+}
+
+// sets secondary callstack/fiber size
+ty_real
+peggml_set_stack_size(ty_real size)
+{
+	if (g_parse_in_progress) return error(1, "cannot set peggml stack size -- parse in progress.");
+	if (size <= 0) return error(2, "peggml stack size must be positive");
+	try
+	{
+		_g_parse_cs_ptr.reset(new callstack(static_cast<size_t>(size)));
+		if (!_g_parse_cs_ptr)
+		{
+			return error(3, "error allocating stack");
+		}
+	}
+	catch (...)
+	{
+		return error(4, "error allocating stack");
+	}
+	return 0;
 }
 
 ty_real

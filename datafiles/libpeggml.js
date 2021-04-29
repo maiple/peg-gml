@@ -1782,8 +1782,8 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  46108: function() {throw 'Canceled!'},  
- 46126: function($0, $1) {setTimeout(function() { __emscripten_do_dispatch_to_thread($0, $1); }, 0);}
+  46220: function() {throw 'Canceled!'},  
+ 46238: function($0, $1) {setTimeout(function() { __emscripten_do_dispatch_to_thread($0, $1); }, 0);}
 };
 function initPthreadsJS(){ PThread.initRuntime(); }
 
@@ -6444,6 +6444,12 @@ var _peggml_error = Module["_peggml_error"] = createExportWrapper("peggml_error"
 var _peggml_error_str = Module["_peggml_error_str"] = createExportWrapper("peggml_error_str");
 
 /** @type {function(...*):?} */
+var _peggml_set_error = Module["_peggml_set_error"] = createExportWrapper("peggml_set_error");
+
+/** @type {function(...*):?} */
+var _peggml_clear_error = Module["_peggml_clear_error"] = createExportWrapper("peggml_clear_error");
+
+/** @type {function(...*):?} */
 var _peggml_abi_test = Module["_peggml_abi_test"] = createExportWrapper("peggml_abi_test");
 
 /** @type {function(...*):?} */
@@ -6457,6 +6463,9 @@ var _peggml_parser_enable_packrat = Module["_peggml_parser_enable_packrat"] = cr
 
 /** @type {function(...*):?} */
 var _peggml_parser_destroy = Module["_peggml_parser_destroy"] = createExportWrapper("peggml_parser_destroy");
+
+/** @type {function(...*):?} */
+var _peggml_set_stack_size = Module["_peggml_set_stack_size"] = createExportWrapper("peggml_set_stack_size");
 
 /** @type {function(...*):?} */
 var _peggml_parser_set_symbol_id = Module["_peggml_parser_set_symbol_id"] = createExportWrapper("peggml_parser_set_symbol_id");
@@ -6678,8 +6687,8 @@ var _asyncify_start_rewind = Module["_asyncify_start_rewind"] = createExportWrap
 /** @type {function(...*):?} */
 var _asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = createExportWrapper("asyncify_stop_rewind");
 
-var __emscripten_allow_main_runtime_queued_calls = Module['__emscripten_allow_main_runtime_queued_calls'] = 46096;
-var __emscripten_main_thread_futex = Module['__emscripten_main_thread_futex'] = 51724;
+var __emscripten_allow_main_runtime_queued_calls = Module['__emscripten_allow_main_runtime_queued_calls'] = 46208;
+var __emscripten_main_thread_futex = Module['__emscripten_main_thread_futex'] = 51740;
 
 
 

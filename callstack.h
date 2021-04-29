@@ -72,7 +72,7 @@ public:
         , m_stack_base(stack_direction() ? (m_array.data() + m_array.size() - 1) : m_array.data())
     { }
 
-    // start execution; pass a lambda in to execute.
+    // start execution; pass a std::function in to execute.
     #if defined(__GNUC__)
         __attribute__((optimize("O0")))
         __attribute__((noinline))
@@ -180,13 +180,13 @@ private:
         // step 1: set stack pointer registers to secondary stack ------------------------
 
         // macros: see https://sourceforge.net/p/predef/wiki/Architectures/
-        #if defined(__GNUC__)
+        #if defined(__GNUC__) || defined(__clang__)
             #if defined(__i386__)
                 #define PEGGML_ARCH_DEFINED
                 // x86
                 asm volatile(
-                    "movl %0, esp\n\t"
-                    "movl esp, ebp"
+                    "movl %0, %%esp\n\t"
+                    "movl %%esp, %%ebp"
                     : /* No outputs. */
                     : "rm" (m_stack_base)
                 );

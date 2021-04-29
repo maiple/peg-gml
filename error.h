@@ -49,3 +49,17 @@ external ty_string glue(ERROR_PREFIX, _error_str)()
 {
     return gError.m_error.c_str();
 }
+
+// sets error string
+external ty_real glue(ERROR_PREFIX, _set_error)(ty_string s)
+{
+    gError._error(s);
+    return 0;
+}
+
+// resets error
+external ty_real glue(ERROR_PREFIX, _clear_error)()
+{
+    gError._clear_error();
+    return 0;
+}

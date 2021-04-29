@@ -13,20 +13,24 @@ peggml_abi_test();
 external ty_real
 peggml_version();
 
+/// sets parsing stack size in bytes. (optional. Defaults to 8 mb.)
+external ty_real
+peggml_set_stack_size(ty_real size);
+
 // Create new parser for the given grammar syntax
 // see [https://github.com/yhirose/cpp-peglib#cpp-peglib] for syntax
 // returns its handle, or -1 on failure
 external handle_t
 peggml_parser_create(ty_string);
 
-// enable packrat parsing
-external ty_real
-peggml_parser_enable_packrat(handle_t);
-
 // Destroy grammar syntax
 // (returns 0 on success)
 external ty_real
 peggml_parser_destroy(handle_t);
+
+// enable packrat parsing
+external ty_real
+peggml_parser_enable_packrat(handle_t);
 
 // define a nonzero symbol id for a symbol
 // this will be returned from peggml_parse_next().
