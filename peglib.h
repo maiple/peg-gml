@@ -8,7 +8,12 @@
 #pragma once
 
 #include <algorithm>
-#include <any>
+#if __has_include(<any>)
+  #include <any>
+#else
+  #define linb std
+  #include "any.hpp"
+#endif
 #include <cassert>
 #include <cctype>
 #if __has_include(<charconv>)
