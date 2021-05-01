@@ -1,3 +1,7 @@
+#include <mutex>
+
+std::mutex m;
+
 #include "peglib.h"
 #include "util.h"
 #include "callstack.h"
