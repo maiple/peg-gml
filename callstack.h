@@ -70,14 +70,17 @@ public:
     bool is_error()  const { return m_state == CS_ERROR; }
     const char* error_what() const { return m_error_what.c_str(); }
 
-    intptr_t current_stack_depth() const
+    size_t get_stack_size() const
+    { return m_array.size(); }
+
+    size_t current_stack_depth() const
     {
         return std::abs(reinterpret_cast<intptr_t>(m_stack_start)
             - reinterpret_cast<intptr_t>(m_stack_yield_at));
     }
 
     // scans stack to estimate depth.
-    uintptr_t estimate_stack_depth() const
+    size_t estimate_stack_depth() const
     {
         // estimate from both directions and take max.
         uintptr_t stack_depth_up = 0, stack_depth_down = 0;

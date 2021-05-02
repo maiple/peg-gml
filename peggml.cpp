@@ -175,6 +175,11 @@ peggml_set_stack_size(ty_real size)
 	return 0;
 }
 
+ty_real peggml_set_stack_size()
+{
+	return get_parse_cs().get_stack_size();
+}
+
 external ty_real
 peggml_stack_current_depth()
 {

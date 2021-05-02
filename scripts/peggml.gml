@@ -92,9 +92,9 @@ return external_call(global._peggml_set_stack_size, argument0)
 peggml_init()
 return external_call(global._peggml_stack_current_depth)
 
-#define peggml_stack_estimate_usage
+#define peggml_estimate_stack_usage
 peggml_init()
-return external_call(global._peggml_stack_estimate_usage)
+return external_call(global._peggml_estimate_stack_usage)
 
 #define peggml_parser_create
 peggml_init()

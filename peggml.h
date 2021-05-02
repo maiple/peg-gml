@@ -19,6 +19,9 @@ peggml_version();
 external ty_real
 peggml_set_stack_size(ty_real size);
 
+external ty_real
+peggml_get_stack_size();
+
 // how much of the stack depth is currently in use (in bytes)
 external ty_real
 peggml_stack_current_depth();
