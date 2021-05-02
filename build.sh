@@ -48,5 +48,5 @@ fi
 if command -v emcc && [ "$PEGGML_BUILD_EMCC" != "0" ]
 then
     echo "building for emscripten..."
-    emcc $COMMON_ARGS -s ASYNCIFY -o datafiles/libpeggml.js  -DPEGGML_ISL_DLL -o datafiles/libpeggml.js -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]'
+    emcc -std=gnu++17 peggml.cpp -pthread -s ASYNCIFY -o datafiles/libpeggml.js  -DPEGGML_ISL_DLL -o datafiles/libpeggml.js -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]'
 fi

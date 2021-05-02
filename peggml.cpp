@@ -33,7 +33,7 @@ peggml_abi_test()
 ty_real
 peggml_version()
 {
-	return 1.1;
+	return PEGGML_VERSION;
 }
 
 using namespace peg;
@@ -175,6 +175,18 @@ peggml_set_stack_size(ty_real size)
 	return 0;
 }
 
+external ty_real
+peggml_stack_current_depth()
+{
+	return g_parse_cs.current_stack_depth();
+}
+
+external ty_real
+peggml_estimate_stack_usage()
+{
+	return g_parse_cs.estimate_stack_depth();
+}
+
 ty_real
 peggml_parser_set_symbol_id(handle_t handle, ty_string symbol, symbol_id_t symbol_id)
 {
@@ -231,6 +243,10 @@ peggml_parse_next()
 	}
 	else
 	{
+		if (g_parse_cs.is_error())
+		{
+			return error(-1, "exception during parse: %s", g_parse_cs.error_what());
+		}
 		return 0;
 	}
 }

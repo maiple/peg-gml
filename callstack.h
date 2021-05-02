@@ -11,18 +11,35 @@ protected:
     volatile enum {
         CS_INACTIVE,
         CS_SUSPENDED,
-        CS_ACTIVE
+        CS_ACTIVE,
+        CS_ERROR
     } m_state { CS_INACTIVE };
+    std::vector<char> m_array; // size will be fixed
+    volatile void* m_stack_start; // marks a 'start' point on the stack. (Might not be exactly the true base of the stack, but we need this to combat an unknown stack growth direction.)
+    volatile void* m_stack_yield_at; // marks the current usage on the stack.
 
+    void mark_stack_start() {
+        char a;
+        m_stack_start = &a;
+    }
+
+    void mark_stack_yield_at() {
+        char a;
+        m_stack_yield_at = &a;
+    }
+
+protected:
     callstack_base& operator=(const callstack_base& other)=delete;
     callstack_base& operator=(callstack_base&& other)=delete;
 
+    std::string m_error_what;
+
     void verify_state_on_resume()
     {
-        if (m_state == CS_ACTIVE) {
+        if (is_active()) {
             throw std::runtime_error("cannot resume stack -- already active.");
         }
-        else if (m_state == CS_INACTIVE)
+        else if (is_inactive())
         {
             throw std::runtime_error("cannot resume stack -- inactive.");
         }
@@ -30,7 +47,7 @@ protected:
 
     void verify_state_on_begin()
     {
-        if (m_state != CS_INACTIVE)
+        if (!is_inactive())
         {
             throw std::runtime_error("cannot begin stackframe -- already active or suspended.");
         }
@@ -45,30 +62,65 @@ protected:
     }
 
 public:
-    bool active()    const { return m_state == CS_ACTIVE; }
-    bool suspended() const { return m_state == CS_SUSPENDED; }
-    bool inactive()  const { return m_state == CS_INACTIVE; }
+    callstack_base(size_t size = 8000000)
+        : m_array(size) { }
+    bool is_active()    const { return m_state == CS_ACTIVE; }
+    bool is_suspended() const { return m_state == CS_SUSPENDED; }
+    bool is_inactive()  const { return m_state == CS_INACTIVE || m_state == CS_ERROR; }
+    bool is_error()  const { return m_state == CS_ERROR; }
+    const char* error_what() const { return m_error_what.c_str(); }
+
+    intptr_t current_stack_depth() const
+    {
+        return std::abs(reinterpret_cast<intptr_t>(m_stack_start)
+            - reinterpret_cast<intptr_t>(m_stack_yield_at));
+    }
+
+    // scans stack to estimate depth.
+    uintptr_t estimate_stack_depth() const
+    {
+        // estimate from both directions and take max.
+        uintptr_t stack_depth_up = 0, stack_depth_down = 0;
+        for (size_t i = 0; i < m_array.size(); ++i)
+        {
+            if (m_array[i] != 0)
+            {
+                stack_depth_up = i;
+                break;
+            }
+        }
+        for (size_t i = m_array.size(); i --> 0;)
+        {
+            if (m_array[i] != 0)
+            {
+                stack_depth_down = m_array.size() - i;
+                break;
+            }
+        }
+
+        return std::max(stack_depth_up, stack_depth_down);
+    }
 };
 
 #ifndef EMSCRIPTEN
 
 
 // default size is 8 mb
-class callstack : callstack_base
+class callstack : public callstack_base
 {
     static constexpr int CS_TERMINATE = 1;
     static constexpr int CS_YIELD = 2;
     static constexpr int CS_RESUME = 3;
+    static constexpr int CS_CATCH = 4;
     
     jmp_buf m_env_external;
     jmp_buf m_env_internal;
     std::function<void()> m_main;
-    std::vector<char> m_array; // size will be fixed
     volatile void* m_stack_base;
-
+    
 public:
     callstack(size_t size = 8000000)
-        : m_array(size)
+        : callstack_base(size)
         , m_stack_base(stack_direction() ? (m_array.data() + m_array.size() - 1) : m_array.data())
     { }
 
@@ -123,6 +175,11 @@ public:
             {
                 m_state = CS_SUSPENDED;
                 return true;
+            }
+        case CS_CATCH:
+            {
+                m_state = CS_ERROR;
+                return false;
             }
         default:
             {
@@ -235,8 +292,22 @@ private:
         }
         else
         {
-            m_main();
-            longjmp(m_env_external, CS_TERMINATE);
+            bool error = false;
+            try
+            {
+                m_main();
+            }
+            catch (const std::exception& e)
+            {
+                error = true;
+                m_error_what = e.what();
+            }
+            catch (...)
+            {
+                error = true;
+                m_error_what = "(unknown exception type)";
+            }
+            longjmp(m_env_external, error ? CS_CATCH : CS_TERMINATE);
         }
     }
     
@@ -250,16 +321,15 @@ private:
 
 #include "emscripten/fiber.h"
 
-class callstack : callstack_base
+class callstack : public callstack_base
 {
-    std::vector<char> m_array;
     emscripten_fiber_t m_fiber;
     emscripten_fiber_t m_fiber_main;
     std::function<void()> m_main;
 
 public:
     callstack(size_t size = 8000000)
-        : m_array(size)
+        : callstack_base(size)
     {
         // partition the array.
         size_t boundaries[] = {0, m_array.size() / 3, 2 * m_array.size() / 3, m_array.size()};
@@ -317,8 +387,21 @@ private:
     {
         while (true)
         {
-            m_main();
-            m_state = CS_INACTIVE;
+            try
+            {
+                m_main();
+                m_state = CS_INACTIVE;
+            }
+            catch (const std::exception& e)
+            {
+                m_error_what = e.what();
+                m_state = CS_ERROR;
+            }
+            catch (...)
+            {
+                m_error_what = "(unknown exception type)";
+                m_state = CS_ERROR;
+            }
             m_main = [](){};
             emscripten_fiber_swap(&m_fiber, &m_fiber_main);
         }

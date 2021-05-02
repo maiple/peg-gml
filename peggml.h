@@ -5,17 +5,28 @@ typedef ty_real symbol_id_t;
 typedef ty_real index_t;
 typedef ty_real uuid_t;
 
+
 // ABI test -- should return "gml-peglib"
 external ty_string
 peggml_abi_test();
 
-// Version number
+// Version number (can use this to compare header to compiled binary)
 external ty_real
 peggml_version();
+#define PEGGML_VERSION 1.2
 
 /// sets parsing stack size in bytes. (optional. Defaults to 8 mb.)
 external ty_real
 peggml_set_stack_size(ty_real size);
+
+// how much of the stack depth is currently in use (in bytes)
+external ty_real
+peggml_stack_current_depth();
+
+// estimates the maximum depth reached so far in the parsing stack (in bytes)
+// (this can take a while, as it scans the memory.)
+external ty_real
+peggml_estimate_stack_usage();
 
 // Create new parser for the given grammar syntax
 // see [https://github.com/yhirose/cpp-peglib#cpp-peglib] for syntax
