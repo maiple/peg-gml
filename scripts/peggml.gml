@@ -190,7 +190,7 @@ var handler_map = global._peggml_handler_map[parser]
 
 var args
 args[0] = script
-for (var i = 0; i < argument_count; ++i)
+for (var i = 0; i < argument_count - 3; ++i)
 {
     args[i + 1] = argument[i + 3]
 }
